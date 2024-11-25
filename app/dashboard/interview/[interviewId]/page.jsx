@@ -3,18 +3,27 @@
 import { Button } from "@/components/ui/button";
 import { db } from "@/utils/db";
 import { MockInterview } from "@/utils/Schema";
+import { useUser } from "@clerk/nextjs";
 import { eq } from "drizzle-orm";
 import { Lightbulb, WebcamIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Webcam from "react-webcam";
+import { toast } from "sonner";
 
 const Interview = ({ params }) => {
   const [interviewData, setInterviewData] = useState();
   const [webCamEnabled, setWebCamEnabled] = useState(false);
+  const router = useRouter();
+
+  const { user, isLoaded } = useUser();
+
   useEffect(() => {
-    GetInterviewDetails();
-  }, []);
+    if (isLoaded) {
+      GetInterviewDetails();
+    }
+  }, [isLoaded]);
 
   const GetInterviewDetails = async () => {
     const result = await db
@@ -22,8 +31,16 @@ const Interview = ({ params }) => {
       .from(MockInterview)
       .where(eq(MockInterview.mockId, params.interviewId));
 
+    if (result.length <= 0) {
+      toast.error("Error while fetchin the data");
+      return router.replace("/dashboard");
+    }
+
+    if (result[0].createdBy != user?.primaryEmailAddress?.emailAddress) {
+      toast.error("Something went wrong");
+      return router.replace("/dashboard");
+    }
     setInterviewData(result[0]);
-    console.log(result)
   };
   return (
     <div className="my-10 ">
@@ -48,8 +65,12 @@ const Interview = ({ params }) => {
 
           <div className="p-5 border rounded-lg border-yellow-300 bg-yellow-100">
             <h2 className="flex gap-2 items-center text-yellow-500">
-             <Lightbulb/><strong>Information</strong></h2>
-             <h2 className="mt-3 text-yellow-400">{process.env.NEXT_PUBLIC_INFORMATION}</h2>
+              <Lightbulb />
+              <strong>Information</strong>
+            </h2>
+            <h2 className="mt-3 text-yellow-400">
+              {process.env.NEXT_PUBLIC_INFORMATION}
+            </h2>
           </div>
         </div>
 
@@ -69,7 +90,7 @@ const Interview = ({ params }) => {
               {" "}
               <WebcamIcon className="h-72 w-full my-7 p-20 bg-secondary rounded-lg border" />
               <Button
-              variant={"ghost"}
+                variant={"ghost"}
                 onClick={() => {
                   setWebCamEnabled(true);
                 }}
@@ -79,16 +100,12 @@ const Interview = ({ params }) => {
             </>
           )}
         </div>
-
-        
       </div>
       <div className="flex justify-end items-end">
         <Link href={`/dashboard/interview/${params.interviewId}/start`}>
-        <Button>Start Interview</Button>
+          <Button>Start Interview</Button>
         </Link>
-      
       </div>
-      
     </div>
   );
 };
